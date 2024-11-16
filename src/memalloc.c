@@ -116,3 +116,14 @@ void memfree(void *ptr)
         }
     }
 }
+
+void print_free_list() {
+    Block* current = free_list;
+    printf("Free List:\n");
+    while (current) {
+        printf("Block at %p: size=%zu, free=%d, next=%p\n",
+               (void*)current, current->size, current->free, (void*)current->next);
+        current = current->next;
+    }
+    printf("\n");
+}
