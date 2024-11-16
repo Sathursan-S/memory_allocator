@@ -1,10 +1,17 @@
 #include "memalloc.h"
-#include <sys/mman.h> // For mmap
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <sys/mman.h>
+#endif // For mmap
 #include <unistd.h>   // For getpagesize
 #include <stdio.h>    // For perror
 #include <stdlib.h>   // For exit
 
 static Block *free_list = NULL; // Global pointer to the free list
+
+void* mmap_helper(size_t size);
+int munmap_helper(void* addr, size_t size);
 
 void init_pool(size_t size)
 {
@@ -12,10 +19,9 @@ void init_pool(size_t size)
     size_t total_size = size + sizeof(Block);
 
     // Allocate memory using mmap
-    free_list = (Block *)mmap(NULL, total_size, PROT_READ | PROT_WRITE,
-                              MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+    free_list = (Block *)mmap_helper(total_size);
 
-    if (free_list == MAP_FAILED)
+    if (free_list == NULL)
     {
         perror("mmap failed");
         exit(EXIT_FAILURE); // Exit if mmap fails
@@ -65,9 +71,8 @@ void *memalloc(size_t size)
 
     // No suitable block found, expand the pool
     size_t total_size = size + sizeof(Block);
-    Block *new_block = (Block *)mmap(NULL, total_size, PROT_READ | PROT_WRITE,
-                                     MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
-    if (new_block == MAP_FAILED)
+    Block *new_block = (Block *)mmap_helper(total_size);
+    if (new_block == NULL)
     {
         perror("mmap failed");
         exit(EXIT_FAILURE);
@@ -96,7 +101,7 @@ void memfree(void *ptr)
         return;
 
     // Move back to the block metadata
-    Block *current = (Bloc *)((char *)ptr - sizeof(Block));
+    Block *current = (Block*)((char *)ptr - sizeof(Block));
     current->free = 1; // Mark the block as free
 
     // Merge with the next block if it's free
@@ -110,7 +115,7 @@ void memfree(void *ptr)
     // Shrink the pool if this is the last block (end of datasegment or heap)
     if (current->next == NULL)
     {
-        if (munmap(current, current->size + sizeof(Block)) == -1)
+        if (munmap_helper(current, current->size + sizeof(Block)) == -1)
         {
             perror("munmap failed");
         }
@@ -126,4 +131,37 @@ void print_free_list() {
         current = current->next;
     }
     printf("\n");
+}
+
+// helper functions
+void* mmap_helper(size_t size) {
+#ifdef _WIN32
+    void* addr = VirtualAlloc(NULL, size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+    if (addr == NULL) {
+        perror("VirtualAlloc failed");
+        return NULL;
+    }
+#else
+    void* addr = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+    if (addr == MAP_FAILED) {
+        perror("mmap failed");
+        return NULL;
+    }
+#endif
+    return addr;
+}
+
+int munmap_helper(void* addr, size_t size) {
+#ifdef _WIN32
+    if (!VirtualFree(addr, 0, MEM_RELEASE)) {
+        perror("VirtualFree failed");
+        return -1;
+    }
+#else
+    if (munmap(addr, size) == -1) {
+        perror("munmap failed");
+        return -1;
+    }
+#endif
+    return 0;
 }
