@@ -1,37 +1,62 @@
 # Compiler and flags
-CC = gcc
-CFLAGS = -Wall -Wextra -std=c11
-LDFLAGS =
+CC = gcc                             # Set the compiler to GCC
+CFLAGS = -Wall -Wextra -std=c11      # Compiler flags: show all warnings, use C11 standard
+LDFLAGS =                            # Linker flags (none defined for now)
 
 # Directories
-SRCDIR = src
-BUILDDIR = build
-TESTDIR = tests
+SRCDIR = ./src                         # Source code directory
+BUILDDIR = ./build                     # Build (object files and executables) directory
+TESTDIR = ./tests                      # Test files directory
 
-# Source files
-SRC = $(wildcard $(SRCDIR)/*.c)
-OBJ = $(patsubst $(SRCDIR)/%.c,$(BUILDDIR)/%.o,$(SRC))
+# Source and Object files
+SRC = $(wildcard $(SRCDIR)/*.c)      # Find all .c files in src/
+OBJ = $(patsubst $(SRCDIR)/%.c,$(BUILDDIR)/%.o,$(SRC)) # Map .c files to .o files in build/
 
-# Output binary
-TARGET = $(BUILDDIR)/memory_allocator
+# Executables
+MAIN_EXEC = $(BUILDDIR)/main         # Main executable
+TEST_EXEC = $(BUILDDIR)/test_memalloc # Test executable
 
-# Build target
-all: $(TARGET)
+# OS Detection and Platform-Specific Settings
+ifeq ($(OS),Windows_NT)              # If running on Windows
+    SHELL = pwsh                     # Use PowerShell 7 as the shell
+    RM = Remove-Item -Force -Recurse # PowerShell command to delete files
+    MKDIR = New-Item -ItemType Directory -Force # PowerShell command to create directories
+    RUN_CMD = $(MAIN_EXEC).exe       # Command to run the main executable
+else                                 # Assume a UNIX-like system
+    SHELL = /bin/sh                  # Use the default shell for Linux/Mac
+    RM = rm -rf                      # Command to delete files
+    MKDIR = mkdir -p $(BUILDDIR)     # Command to create build directory
+    RUN_CMD = ./$(MAIN_EXEC)         # Command to run the main executable
+endif
 
-$(TARGET): $(OBJ)
-	$(CC) $(OBJ) -o $@ $(LDFLAGS)
+# Default target
+all: main                            # Default target is to build the main executable
 
-$(BUILDDIR)/%.o: $(SRCDIR)/%.c
-	mkdir -p $(BUILDDIR)
-	$(CC) $(CFLAGS) -c $< -o $@
+# Compile main executable
+main: $(MAIN_EXEC)                   # 'main' depends on the main executable
 
-# Run tests
-test: $(TARGET)
-	$(CC) $(CFLAGS) $(TESTDIR)/test_memalloc.c -o $(BUILDDIR)/test_memalloc
-	$(BUILDDIR)/test_memalloc
+$(MAIN_EXEC): $(OBJ)                 # Main executable depends on object files
+	$(CC) $(CFLAGS) -o $@ $(SRCDIR)/main.c $(OBJ) # Compile and link
 
-# Clean build artifacts
+# Compile test executable
+test: $(TEST_EXEC)                   # 'test' depends on the test executable
+	$(TEST_EXEC)                     # Run the test executable
+
+$(TEST_EXEC): $(OBJ)                 # Test executable depends on object files
+	$(CC) $(CFLAGS) -o $@ $(TESTDIR)/test_memalloc.c $(OBJ) # Compile and link
+
+# Build object files from source files
+$(BUILDDIR)/%.o: $(SRCDIR)/%.c       # Rule to compile .c files to .o files
+	@$(MKDIR) $(BUILDDIR)            # Create build directory if it doesn't exist
+	$(CC) $(CFLAGS) -c $< -o $@      # Compile source file into object file
+
+# Clean target to remove build artifacts
 clean:
-	rm -rf $(BUILDDIR)
+	$(RM) $(BUILDDIR)/*              # Remove all files in build directory
 
-.PHONY: all clean test
+# Run the main executable
+run: main
+	$(RUN_CMD)                       # Run the main executable
+
+# Phony targets to avoid conflicts with files named 'all', 'main', 'test', 'clean', etc.
+.PHONY: all main test clean run
