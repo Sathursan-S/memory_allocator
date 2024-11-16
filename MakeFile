@@ -1,0 +1,37 @@
+# Compiler and flags
+CC = gcc
+CFLAGS = -Wall -Wextra -std=c11
+LDFLAGS =
+
+# Directories
+SRCDIR = src
+BUILDDIR = build
+TESTDIR = tests
+
+# Source files
+SRC = $(wildcard $(SRCDIR)/*.c)
+OBJ = $(patsubst $(SRCDIR)/%.c,$(BUILDDIR)/%.o,$(SRC))
+
+# Output binary
+TARGET = $(BUILDDIR)/memory_allocator
+
+# Build target
+all: $(TARGET)
+
+$(TARGET): $(OBJ)
+	$(CC) $(OBJ) -o $@ $(LDFLAGS)
+
+$(BUILDDIR)/%.o: $(SRCDIR)/%.c
+	mkdir -p $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Run tests
+test: $(TARGET)
+	$(CC) $(CFLAGS) $(TESTDIR)/test_memalloc.c -o $(BUILDDIR)/test_memalloc
+	$(BUILDDIR)/test_memalloc
+
+# Clean build artifacts
+clean:
+	rm -rf $(BUILDDIR)
+
+.PHONY: all clean test
