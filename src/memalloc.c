@@ -90,3 +90,29 @@ void *memalloc(size_t size)
     return (char *)new_block + sizeof(Block);
 }
 
+void memfree(void *ptr)
+{
+    if (!ptr)
+        return;
+
+    // Move back to the block metadata
+    Block *current = (Bloc *)((char *)ptr - sizeof(Block));
+    current->free = 1; // Mark the block as free
+
+    // Merge with the next block if it's free
+    Block *next = current->next;
+    if (next && next->free)
+    {
+        current->size += sizeof(Block) + next->size;
+        current->next = next->next;
+    }
+
+    // Shrink the pool if this is the last block (end of datasegment or heap)
+    if (current->next == NULL)
+    {
+        if (munmap(current, current->size + sizeof(Block)) == -1)
+        {
+            perror("munmap failed");
+        }
+    }
+}
